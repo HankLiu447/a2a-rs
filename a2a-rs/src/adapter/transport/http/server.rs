@@ -75,6 +75,31 @@ where
         }
     }
 
+    /// Build the A2A Axum Router without binding to a listener.
+    ///
+    /// Use this to nest into an existing Axum application:
+    /// ```rust,ignore
+    /// let a2a_router = HttpServer::new(processor, agent_info, addr).into_router();
+    /// let app = your_existing_router.nest("/a2a", a2a_router);
+    /// ```
+    pub fn into_router(self) -> Router {
+        let mut app = Router::new()
+            .route("/", post(handle_request))
+            .route("/.well-known/agent-card.json", get(handle_agent_card))
+            .route("/agent-card", get(handle_agent_card))
+            .route("/skills", get(handle_skills))
+            .route("/skills/{id}", get(handle_skill_by_id))
+            .with_state(ServerState {
+                processor: self.processor,
+                agent_info: self.agent_info,
+            });
+
+        if let Some(auth) = self.authenticator {
+            app = with_auth(app, (*auth).clone());
+        }
+        app
+    }
+
     /// Start the HTTP server
     #[cfg_attr(feature = "tracing", instrument(skip(self), fields(
         server.address = %self.address,
